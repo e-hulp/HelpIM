@@ -28,6 +28,8 @@ class Participant(models.Model):
     conversation = models.ForeignKey(Conversation)
     name = models.CharField(max_length=64)
 
+    user = models.OneToOneField(User, null=True)
+
     role = models.CharField(max_length=2, choices=(
       (ROLE_CLIENT, _('Client')),
       (ROLE_STAFF, _('Staff')),

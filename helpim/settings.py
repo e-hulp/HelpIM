@@ -129,6 +129,7 @@ INSTALLED_APPS = (
     'south',
     'threadedcomments',
     'rosetta',
+    'helpim.common',
 )
 
 CHAT = {
@@ -198,4 +199,3 @@ LOGGING = {
     }
 }
 
-HELPIM_RESTRICT_VOLUNTEER_TO_OWN_CONVERSATIONS = False

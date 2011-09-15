@@ -382,8 +382,13 @@ class One2OneRoom(Room):
             self.chat = chat
 
         if not self.staff:
+            user = User.objects.get(username=nick)
             staff = Participant(
-                conversation=self.chat, name=nick, role=Participant.ROLE_STAFF)
+                conversation=self.chat,
+                name=nick,
+                user=user,
+                role=Participant.ROLE_STAFF
+            )
             staff.save()
             self.staff = staff
 

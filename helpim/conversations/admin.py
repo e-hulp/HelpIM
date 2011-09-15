@@ -1,4 +1,5 @@
 from helpim.conversations.models import Conversation, Participant, Message
+from helpim.common.models import AdditionalUserInformation
 from django.utils.translation import ugettext as _
 from django.contrib import admin
 from django import forms
@@ -14,14 +15,14 @@ class MessageInline(admin.StackedInline):
     model = Message
     fieldsets = (
         (None, {
-            'fields': ('sender_name', 'time_sent', 'body',)
+            'fields': ('sender_name', 'created_at', 'body',)
         }),
     )
 
     can_delete = False
 
     if not CONVERSATION_EDITABLE:
-        readonly_fields = ('sender_name', 'time_sent', 'body',)
+        readonly_fields = ('sender_name', 'created_at', 'body',)
         max_num = 0
     else:
         fieldsets[0][1]['fields'] = tuple(['sender'] + list(fieldsets[0][1]['fields']))
@@ -33,11 +34,16 @@ class ParticipantInline(admin.TabularInline):
     template = 'admin/edit_inline/with_block_button.html'
 
     model = Participant
-    can_delete = False
 
-    max_num = 0
-    readonly_fields = ('name', 'role')
-    fields = ('name', 'role', 'blocked')
+    if not CONVERSATION_EDITABLE:
+        max_num = 0
+        readonly_fields = ('name', 'role')
+        can_delete = False
+
+    fields = ['name', 'role', 'blocked']
+
+    if CONVERSATION_EDITABLE:
+        fields += ['user']
 
     verbose_name = _("Participant")
     verbose_name_plural = _("Participants")
@@ -72,17 +78,34 @@ class ConversationAdmin(admin.ModelAdmin):
     def queryset(self, request):
         qs = super(ConversationAdmin, self).queryset(request)
 
-        restrict_to_own_conversations = getattr(settings,
-            "HELPIM_RESTRICT_VOLUNTEER_TO_OWN_CONVERSATIONS", False
-        )
-
-        if (not restrict_to_own_conversations) or request.user.is_superuser:
+        if request.user.is_superuser:
+            # don't restrict the super user
             return qs
-        else:
+
+        if request.user.has_perm('common.view_conversations_of_all_branch_offices'):
+            # don't restrict the user, can view all conversations
+            return qs
+
+        if request.user.has_perm('common.view_conversations_of_own_branch_office'):
+            # restrict user to conversations from same branch office
+
+            try:
+                users_office = request.user.additionaluserinformation.branch_office
+            except AdditionalUserInformation.DoesNotExist:
+                # no user metadata is created, thus no branch office, fallback
+                # to standard behaviour:
+                return qs
+
+
             return qs.filter(
-                     participant__name=request.user.username,
-                     participant__role=Participant.ROLE_STAFF
+                     participant__user__additionaluserinformation__branch_office=users_office
                    )
+
+        # restrict user to own conversations
+        return qs.filter(
+                 participant__user=request.user,
+                 participant__role=Participant.ROLE_STAFF,
+               )
 
 
 admin.site.register(Conversation, ConversationAdmin)
